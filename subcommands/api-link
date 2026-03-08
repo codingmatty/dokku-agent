@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/common-functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/functions"
+
+cmd-agent-api-link() {
+  declare desc="link Agent API service to an app"
+  local cmd="agent:api-link"
+  [[ "$1" == "$cmd" ]] && shift 1
+  declare SERVICE="$1"
+  declare APP="${2:-$DOKKU_APP_NAME}"
+
+  [[ -z "$SERVICE" ]] && dokku_log_fail "Please specify a service name"
+  [[ -z "$APP" ]] && dokku_log_fail "Please specify an app"
+  verify_app_name "$APP"
+  verify_service_name "$SERVICE"
+  service_link "$SERVICE" "$APP"
+}
+
+cmd-agent-api-link "$@"

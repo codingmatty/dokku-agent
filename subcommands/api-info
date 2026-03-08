@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/common-functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/functions"
+
+cmd-agent-api-info() {
+  declare desc="print Agent API service information"
+  local cmd="agent:api-info"
+  [[ "$1" == "$cmd" ]] && shift 1
+  declare SERVICE="$1"
+  declare INFO_FLAG="$2"
+
+  [[ -z "$SERVICE" ]] && dokku_log_fail "Please specify a service name"
+  verify_service_name "$SERVICE"
+  service_info "$SERVICE" "$INFO_FLAG"
+}
+
+cmd-agent-api-info "$@"

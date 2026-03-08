@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+
+add_to_links_file() {
+  declare desc="add an app to the service link file"
+  declare SERVICE="$1" APP="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local LINKS_FILE="$SERVICE_ROOT/LINKS"
+
+  touch "$LINKS_FILE"
+  if sed -i.bak "/^$APP\$/d" "$LINKS_FILE" 2>/dev/null; then
+    rm -f "$LINKS_FILE.bak"
+  else
+    grep -v "^$APP$" "$LINKS_FILE" > "${LINKS_FILE}.tmp" 2>/dev/null || true
+    mv "${LINKS_FILE}.tmp" "$LINKS_FILE" 2>/dev/null || true
+  fi
+  echo "$APP" >> "$LINKS_FILE"
+  sort "$LINKS_FILE" -u -o "$LINKS_FILE"
+}
+
+fn-services-list() {
+  declare desc="list all agent-api services"
+  local services=()
+  [[ ! -d "$PLUGIN_DATA_ROOT" ]] && return 0
+  for f in "$PLUGIN_DATA_ROOT"/*; do
+    [[ -d "$f" ]] && [[ -f "$f/PORT" ]] && services+=("$(basename "$f")")
+  done
+  for s in "${services[@]}"; do
+    [[ -n "$s" ]] && echo "$s"
+  done
+}
+
+get_random_port() {
+  declare desc="retrieve a random available port"
+  local port
+  for _ in 1 2 3 4 5; do
+    port=$((RANDOM % 50000 + 10000))
+    if ! command -v ss &>/dev/null; then
+      if ! netstat -an 2>/dev/null | grep -q "[.:]$port "; then
+        echo "$port" && return 0
+      fi
+    else
+      if ! ss -tuln 2>/dev/null | grep -q "[.:]$port "; then
+        echo "$port" && return 0
+      fi
+    fi
+  done
+  echo $((RANDOM % 50000 + 10000))
+}
+
+get_service_name() {
+  declare desc="retrieve service identifier"
+  declare SERVICE="$1"
+  echo "dokku-agent-api-$SERVICE"
+}
+
+in_links_file() {
+  declare desc="check if LINKS file contains app"
+  declare SERVICE="$1" APP="$2"
+  local LINKS_FILE="$PLUGIN_DATA_ROOT/$SERVICE/LINKS"
+  [[ -f "$LINKS_FILE" ]] && grep -qE "^$APP\$" "$LINKS_FILE"
+}
+
+is_valid_service_name() {
+  declare desc="validate service name"
+  declare SERVICE="$1"
+  [[ -z "$SERVICE" ]] && return 1
+  [[ "$SERVICE" =~ ^[A-Za-z0-9_-]+$ ]] && return 0
+  return 1
+}
+
+remove_from_links_file() {
+  declare desc="remove app from service LINKS file"
+  declare SERVICE="$1" APP="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local LINKS_FILE="$SERVICE_ROOT/LINKS"
+  [[ ! -f "$LINKS_FILE" ]] && return
+  if sed -i.bak "/^$APP\$/d" "$LINKS_FILE" 2>/dev/null; then
+    rm -f "$LINKS_FILE.bak"
+  else
+    grep -v "^$APP$" "$LINKS_FILE" > "${LINKS_FILE}.tmp" 2>/dev/null || true
+    mv "${LINKS_FILE}.tmp" "$LINKS_FILE" 2>/dev/null || true
+  fi
+  sort "$LINKS_FILE" -u -o "$LINKS_FILE"
+}
+
+service_exists() {
+  declare desc="return 0 if service exists"
+  declare SERVICE="$1"
+  [[ -z "$SERVICE" ]] && return 1
+  [[ -d "$PLUGIN_DATA_ROOT/$SERVICE" ]] && [[ -f "$PLUGIN_DATA_ROOT/$SERVICE/PORT" ]] && return 0
+  return 1
+}
+
+service_linked_apps() {
+  declare desc="list linked apps for info output"
+  declare SERVICE="$1"
+  local LINKS_FILE="$PLUGIN_DATA_ROOT/$SERVICE/LINKS"
+  touch "$LINKS_FILE"
+  [[ -z "$(cat "$LINKS_FILE" 2>/dev/null)" ]] && echo '-' && return 0
+  tr '\n' ' ' < "$LINKS_FILE"
+}
+
+service_links() {
+  declare desc="list linked apps"
+  declare SERVICE="$1"
+  local LINKS_FILE="$PLUGIN_DATA_ROOT/$SERVICE/LINKS"
+  [[ ! -f "$LINKS_FILE" ]] || [[ -z "$(cat "$LINKS_FILE" 2>/dev/null)" ]] && return 0
+  cat "$LINKS_FILE"
+}
+
+verify_service_name() {
+  declare desc="verify service exists"
+  declare SERVICE="$1"
+  [[ -z "$SERVICE" ]] && dokku_log_fail "Please specify a service name"
+  is_valid_service_name "$SERVICE" || dokku_log_fail "Invalid service name. Use only [A-Za-z0-9_-]"
+  service_exists "$SERVICE" || dokku_log_fail "Agent API service $SERVICE does not exist"
+}

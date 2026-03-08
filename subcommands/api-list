@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/common-functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/functions"
+
+cmd-agent-api-list() {
+  declare desc="list Agent API services"
+  local cmd="agent:api-list"
+  [[ "$1" == "$cmd" ]] && shift 1
+  service_list
+}
+
+cmd-agent-api-list "$@"

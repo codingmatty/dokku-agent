@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Agent API service plugin config
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export AGENT_API_ROOT="${AGENT_API_ROOT:=$DOKKU_LIB_ROOT/services/agent-api}"
+export DOKKU_LIB_HOST_ROOT="${DOKKU_LIB_HOST_ROOT:=$DOKKU_LIB_ROOT}"
+
+export PLUGIN_COMMAND_PREFIX="agent"
+export PLUGIN_DATA_ROOT="$AGENT_API_ROOT"
+export PLUGIN_DATA_HOST_ROOT="${PLUGIN_DATA_HOST_ROOT:=$DOKKU_LIB_HOST_ROOT/services/agent-api}"
+export PLUGIN_DEFAULT_ALIAS="AGENT_API"
+export PLUGIN_SERVICE="Agent API"
+export PLUGIN_SCHEME="http"
+# Default host for AGENT_API_URL when linking (reachable from app containers)
+export AGENT_API_DEFAULT_HOST="${AGENT_API_DEFAULT_HOST:=172.17.0.1}"

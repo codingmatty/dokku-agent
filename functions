@@ -1,0 +1,288 @@
+#!/usr/bin/env bash
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common-functions"
+
+: "${DOCKER_BIN:=docker}"
+
+agent_api_default_config() {
+  declare desc="write default agent.yaml for a service"
+  declare SERVICE_ROOT="$1"
+  cat > "$SERVICE_ROOT/agent.yaml" << 'YAML'
+agents:
+  root:
+    model: anthropic/claude-sonnet-4-0
+    description: Agent API assistant
+    instruction: You are a helpful assistant. Use the tools available to you.
+    toolsets:
+      - type: think
+YAML
+}
+
+service_create() {
+  declare desc="create an agent API service"
+  declare SERVICE="$1"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local CONFIG_PATH="$2"  # optional path to agent.yaml
+
+  is_valid_service_name "$SERVICE" || dokku_log_fail "Invalid service name. Use only [A-Za-z0-9_-]"
+  [[ -d "$SERVICE_ROOT" ]] && dokku_log_fail "Agent API service $SERVICE already exists"
+
+  mkdir -p "$SERVICE_ROOT" || dokku_log_fail "Unable to create service directory"
+  touch "$SERVICE_ROOT/LINKS"
+
+  if [[ -n "$CONFIG_PATH" ]] && [[ -f "$CONFIG_PATH" ]]; then
+    cp "$CONFIG_PATH" "$SERVICE_ROOT/agent.yaml" || dokku_log_fail "Unable to copy agent config"
+  else
+    agent_api_default_config "$SERVICE_ROOT"
+  fi
+
+  local port
+  port=$(get_random_port)
+  echo "$port" > "$SERVICE_ROOT/PORT"
+  service_start "$SERVICE" 1
+  dokku_log_info2 "Agent API service created: $SERVICE"
+  service_info "$SERVICE"
+}
+
+service_start() {
+  declare desc="start the agent API server for a service"
+  declare SERVICE="$1"
+  local QUIET="${2:-}"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local port pid
+
+  [[ ! -d "$SERVICE_ROOT" ]] && dokku_log_fail "Service $SERVICE does not exist"
+  port=$(cat "$SERVICE_ROOT/PORT" 2>/dev/null)
+  [[ -z "$port" ]] && dokku_log_fail "Service $SERVICE has no PORT"
+
+  if [[ -f "$SERVICE_ROOT/PID" ]]; then
+    pid=$(cat "$SERVICE_ROOT/PID")
+    if kill -0 "$pid" 2>/dev/null; then
+      [[ -z "$QUIET" ]] && dokku_log_warn "Agent API service $SERVICE is already running (PID $pid)"
+      return 0
+    fi
+    rm -f "$SERVICE_ROOT/PID"
+  fi
+
+  if ! "$DOCKER_BIN" agent api --help &>/dev/null; then
+    dokku_log_fail "Docker Agent CLI not found. Run 'dokku agent:install' for instructions."
+  fi
+
+  local session_db="$SERVICE_ROOT/sessions.db"
+  (
+    set +e
+    nohup "$DOCKER_BIN" agent api "$SERVICE_ROOT/agent.yaml" \
+      --listen "0.0.0.0:$port" \
+      --session-db "$session_db" \
+      >> "$SERVICE_ROOT/log" 2>> "$SERVICE_ROOT/error.log" &
+    echo $! > "$SERVICE_ROOT/PID"
+  )
+  sleep 1
+  pid=$(cat "$SERVICE_ROOT/PID" 2>/dev/null)
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    [[ -z "$QUIET" ]] && dokku_log_info2 "Agent API service $SERVICE started on port $port"
+  else
+    dokku_log_fail "Failed to start Agent API service $SERVICE. Check $SERVICE_ROOT/error.log"
+  fi
+}
+
+service_stop() {
+  declare desc="stop the agent API server"
+  declare SERVICE="$1"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local pid
+
+  [[ ! -f "$SERVICE_ROOT/PID" ]] && return 0
+  pid=$(cat "$SERVICE_ROOT/PID")
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+  rm -f "$SERVICE_ROOT/PID"
+  dokku_log_verbose_quiet "Agent API service $SERVICE stopped"
+}
+
+service_status() {
+  declare desc="output running or stopped"
+  declare SERVICE="$1"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local pid
+
+  [[ ! -f "$SERVICE_ROOT/PID" ]] && echo "stopped" && return 0
+  pid=$(cat "$SERVICE_ROOT/PID")
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "running"
+  else
+    echo "stopped"
+  fi
+}
+
+service_url() {
+  declare desc="output the API URL for this service"
+  declare SERVICE="$1"
+  local port host
+  port=$(cat "$PLUGIN_DATA_ROOT/$SERVICE/PORT" 2>/dev/null)
+  host="${AGENT_API_DEFAULT_HOST:-172.17.0.1}"
+  echo "${PLUGIN_SCHEME}://${host}:${port}"
+}
+
+service_info() {
+  declare desc="print service information"
+  declare SERVICE="$1"
+  local INFO_FLAG="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local SERVICE_URL port
+
+  SERVICE_URL=$(service_url "$SERVICE")
+  port=$(cat "$SERVICE_ROOT/PORT" 2>/dev/null)
+
+  local flag_map=(
+    "--config: $SERVICE_ROOT/agent.yaml"
+    "--links: $(service_linked_apps "$SERVICE")"
+    "--port: $port"
+    "--service-root: $SERVICE_ROOT"
+    "--status: $(service_status "$SERVICE")"
+    "--url: $SERVICE_URL"
+  )
+
+  if [[ -z "$INFO_FLAG" ]]; then
+    dokku_log_info2_quiet "$SERVICE Agent API service information"
+    for flag in "${flag_map[@]}"; do
+      dokku_log_verbose "$(printf "%-20s %s" "${flag%%: *}" "${flag#*: })"
+    done
+  else
+    local match=false
+    for flag in "${flag_map[@]}"; do
+      if [[ "$flag" == "${INFO_FLAG}: "* ]]; then
+        echo "${flag#*: }" && match=true
+      fi
+    done
+    [[ "$match" == "true" ]] || dokku_log_fail "Invalid flag. Valid: --config, --links, --port, --service-root, --status, --url"
+  fi
+}
+
+service_link() {
+  declare desc="link agent API service to an app"
+  declare SERVICE="$1" APP="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local SERVICE_URL
+  local LINKS_FILE="$SERVICE_ROOT/LINKS"
+  local ALIAS="${PLUGIN_DEFAULT_ALIAS}_URL"
+
+  SERVICE_URL=$(service_url "$SERVICE")
+
+  if in_links_file "$SERVICE" "$APP"; then
+    dokku_log_fail "App $APP is already linked to Agent API service $SERVICE"
+  fi
+
+  add_to_links_file "$SERVICE" "$APP"
+  if [[ "$DOKKU_GLOBAL_FLAGS" == *"--no-restart"* ]]; then
+    config_set --no-restart "$APP" "${ALIAS}=$SERVICE_URL"
+  else
+    config_set "$APP" "${ALIAS}=$SERVICE_URL"
+  fi
+  dokku_log_info2 "Agent API service $SERVICE linked to $APP (${ALIAS})"
+}
+
+service_unlink() {
+  declare desc="unlink agent API service from an app"
+  declare SERVICE="$1" APP="$2"
+  local ALIAS="${PLUGIN_DEFAULT_ALIAS}_URL"
+
+  if ! in_links_file "$SERVICE" "$APP"; then
+    dokku_log_fail "App $APP is not linked to Agent API service $SERVICE"
+  fi
+
+  remove_from_links_file "$SERVICE" "$APP"
+  if [[ "$DOKKU_GLOBAL_FLAGS" == *"--no-restart"* ]]; then
+    config_unset --no-restart "$APP" "$ALIAS"
+  else
+    config_unset "$APP" "$ALIAS"
+  fi
+  dokku_log_info2 "Agent API service $SERVICE unlinked from $APP"
+}
+
+service_destroy() {
+  declare desc="destroy agent API service"
+  declare SERVICE="$1"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local LINKS_FILE="$SERVICE_ROOT/LINKS"
+
+  [[ -s "$LINKS_FILE" ]] && dokku_log_fail "Cannot destroy service with links. Unlink all apps first: dokku agent:api:unlink $SERVICE <app>"
+
+  service_stop "$SERVICE"
+  rm -rf "$SERVICE_ROOT"
+  dokku_log_info2 "Agent API service deleted: $SERVICE"
+}
+
+service_list() {
+  declare desc="list all agent API services"
+  local services
+  mapfile -t services < <(fn-services-list)
+  if [[ ${#services[@]} -eq 0 ]]; then
+    dokku_log_warn "There are no Agent API services"
+    return
+  fi
+  dokku_log_info2_quiet "Agent API services"
+  for s in "${services[@]}"; do
+    [[ -n "$s" ]] && echo "$s"
+  done
+}
+
+service_expose() {
+  declare desc="expose the Agent API service on a port (optionally set port and restart)"
+  declare SERVICE="$1"
+  declare PORT_ARG="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local port
+  local was_running=false
+
+  [[ ! -d "$SERVICE_ROOT" ]] && dokku_log_fail "Service $SERVICE does not exist"
+  service_status "$SERVICE" | grep -q running && was_running=true
+
+  if [[ -n "$PORT_ARG" ]]; then
+    [[ "$PORT_ARG" =~ ^[0-9]+$ ]] || dokku_log_fail "Port must be a number"
+    $was_running && service_stop "$SERVICE"
+    echo "$PORT_ARG" > "$SERVICE_ROOT/PORT"
+    port="$PORT_ARG"
+    service_start "$SERVICE"
+  else
+    port=$(cat "$SERVICE_ROOT/PORT" 2>/dev/null)
+    [[ -z "$port" ]] && dokku_log_fail "Service $SERVICE has no PORT"
+    $was_running || service_start "$SERVICE"
+  fi
+
+  local url
+  url=$(service_url "$SERVICE")
+  dokku_log_info2 "Agent API service $SERVICE exposed on port $port"
+  dokku_log_info2 "URL: $url"
+}
+
+service_unexpose() {
+  declare desc="stop the Agent API service (no longer listening on port)"
+  declare SERVICE="$1"
+  service_stop "$SERVICE"
+  dokku_log_info2 "Agent API service $SERVICE stopped (no longer exposed)"
+}
+
+service_set_config() {
+  declare desc="update the agent.yaml config for a service and restart"
+  declare SERVICE="$1"
+  declare CONFIG_PATH="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local was_running=false
+
+  [[ -z "$CONFIG_PATH" ]] && dokku_log_fail "Please specify a path to agent.yaml"
+  [[ ! -f "$CONFIG_PATH" ]] && dokku_log_fail "Config file not found: $CONFIG_PATH"
+  [[ ! -d "$SERVICE_ROOT" ]] && dokku_log_fail "Service $SERVICE does not exist"
+
+  service_status "$SERVICE" | grep -q running && was_running=true
+  service_stop "$SERVICE"
+  cp "$CONFIG_PATH" "$SERVICE_ROOT/agent.yaml" || dokku_log_fail "Unable to copy agent config"
+  $was_running && service_start "$SERVICE"
+  dokku_log_info2 "Agent API service $SERVICE config updated from $CONFIG_PATH"
+}

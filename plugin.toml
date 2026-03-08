@@ -1,0 +1,5 @@
+[plugin]
+description = "Run Docker Agent (AI agents) on the server via dokku agent commands"
+version = "0.1.0"
+
+[plugin.config]

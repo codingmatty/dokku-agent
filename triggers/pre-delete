@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/common-functions"
+
+APP="$1"
+[[ -z "$APP" ]] && exit 0
+
+for SERVICE in $(fn-services-list); do
+  [[ -z "$SERVICE" ]] && continue
+  if in_links_file "$SERVICE" "$APP"; then
+    remove_from_links_file "$SERVICE" "$APP"
+  fi
+done

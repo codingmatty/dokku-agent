@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+
+: "${DOCKER_BIN:=docker}"
+
+cmd-agent-install() {
+  declare desc="Verify Docker Agent CLI is installed and show install instructions"
+  declare cmd="agent:install"
+  [[ "$1" == "$cmd" ]] && shift 1
+
+  if ! command -v "$DOCKER_BIN" &>/dev/null; then
+    dokku_log_fail "Docker not found. Dokku requires Docker to be installed."
+  fi
+
+  if "$DOCKER_BIN" agent run --help &>/dev/null; then
+    echo "Docker Agent CLI is already installed."
+    "$DOCKER_BIN" agent run --help 2>&1 | head -5 || true
+    return 0
+  fi
+
+  dokku_log_info1 "Docker Agent CLI is not installed."
+  echo ""
+  echo "To install the Docker Agent CLI plugin on this server:"
+  echo ""
+  echo "1. Download the latest binary from:"
+  echo "   https://github.com/docker/docker-agent/releases"
+  echo ""
+  echo "2. Install the CLI plugin (run as the user that runs 'dokku agent'):"
+  echo "   mkdir -p ~/.docker/cli-plugins"
+  echo "   mv docker-agent ~/.docker/cli-plugins/"
+  echo "   chmod +x ~/.docker/cli-plugins/docker-agent"
+  echo ""
+  echo "3. Set at least one model API key (e.g. in ~/.bashrc or server env):"
+  echo "   export OPENAI_API_KEY=sk-..."
+  echo "   # or ANTHROPIC_API_KEY, GOOGLE_API_KEY, etc."
+  echo ""
+  echo "See https://docker.github.io/docker-agent/ for full documentation."
+}
+
+cmd-agent-install "$@"

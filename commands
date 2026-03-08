@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+
+case "$1" in
+  help | agent:help)
+    help_content_func() {
+      declare desc="return help_content string"
+      cat << 'help_content'
+    agent, Show agent plugin help
+    agent:run [config] [message...], Run Docker Agent (TUI or with messages)
+    agent:exec <config> <message...>, Run Docker Agent in headless mode (--exec)
+    agent:install, Verify Docker Agent CLI is installed and show install instructions
+    agent:api-create <service> [config-path], Create a managed Agent API service
+    agent:api-destroy <service>, Destroy an Agent API service
+    agent:api-info <service> [--flag], Show Agent API service information
+    agent:api-link <service> <app>, Link Agent API service to an app
+    agent:api-list, List Agent API services
+    agent:api-start <service>, Start Agent API service
+    agent:api-stop <service>, Stop Agent API service
+    agent:api-unlink <service> <app>, Unlink Agent API service from an app
+    agent:api-expose <service> [port], Expose Agent API service (set port and/or start)
+    agent:api-unexpose <service>, Stop service (no longer exposed)
+    agent:api-set-config <service> <path>, Update agent.yaml and restart
+help_content
+    }
+
+    if [[ $1 = "agent:help" ]]; then
+      echo -e 'Usage: dokku agent[:run|:exec|:install|:api-create|:api-info|...] [options]'
+      echo ''
+      echo 'Run Docker Agent on the server. Managed Agent API services (like postgres):'
+      echo '  dokku agent:api-create test-agent              # create with default config'
+      echo '  dokku agent:api-create test-agent ./agent.yaml'
+      echo '  dokku agent:api-link test-agent agent-app     # sets AGENT_API_URL on app'
+      echo '  dokku agent:api-info test-agent'
+      echo '  dokku agent:api-destroy test-agent'
+      echo ''
+      echo 'Passthrough: agent:run, agent:exec, agent:install.'
+      echo ''
+      echo 'Additional commands:'
+      help_content_func | sort | column -c2 -t -s,
+    else
+      help_content_func
+    fi
+    ;;
+
+  *)
+    exit $DOKKU_NOT_IMPLEMENTED_EXIT
+    ;;
+esac

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+
+cmd-agent-default() {
+  declare desc="Show agent plugin usage"
+  declare cmd="agent"
+  [[ "$1" == "$cmd" ]] && shift 1
+  [[ -n $DOKKU_APP_NAME ]] && set -- $DOKKU_APP_NAME "$@"
+  set -- $cmd "$@"
+
+  echo "Dokku agent plugin: run Docker Agent on the server."
+  echo ""
+  echo "Usage: dokku agent:run [config] [message...]  - Run agent (TUI or with messages)"
+  echo "       dokku agent:exec <config> <message...> - Run agent in headless mode"
+  echo "       dokku agent:api-create <service>      - Create managed Agent API service"
+  echo "       dokku agent:api-link <service> <app>   - Link API service to app (AGENT_API_URL)"
+  echo "       dokku agent:api-info <service>        - Show API service info"
+  echo "       dokku agent:api-destroy <service>     - Destroy API service"
+  echo "       dokku agent:api-expose <service> [port] - Expose on port; agent:api-set-config to update config"
+  echo "       dokku agent:install                    - Verify Docker Agent is installed"
+  echo ""
+  echo "See 'dokku agent:help' for full help."
+}
+
+cmd-agent-default "$@"
