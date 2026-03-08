@@ -119,3 +119,55 @@ verify_service_name() {
   is_valid_service_name "$SERVICE" || dokku_log_fail "Invalid service name. Use only [A-Za-z0-9_-]"
   service_exists "$SERVICE" || dokku_log_fail "Agent API service $SERVICE does not exist"
 }
+
+# API keys (stored in AGENT_KEYS_FILE, loaded by agent_load_keys in config)
+is_valid_key_name() {
+  declare KEY="$1"
+  [[ -z "$KEY" ]] && return 1
+  [[ "$KEY" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && return 0
+  return 1
+}
+
+agent_set_key() {
+  declare desc="set a key in the plugin keys file"
+  declare KEY="$1" VALUE="$2"
+  local keys_dir
+  [[ -z "$KEY" ]] && dokku_log_fail "Please specify a key name (e.g. ANTHROPIC_API_KEY)"
+  is_valid_key_name "$KEY" || dokku_log_fail "Invalid key name. Use only letters, numbers, underscore."
+  keys_dir="$(dirname "$AGENT_KEYS_FILE")"
+  mkdir -p "$keys_dir" || dokku_log_fail "Cannot create $keys_dir"
+  if [[ -f "$AGENT_KEYS_FILE" ]]; then
+    if grep -qE "^${KEY}=" "$AGENT_KEYS_FILE" 2>/dev/null; then
+      if sed -i.bak "/^${KEY}=/d" "$AGENT_KEYS_FILE" 2>/dev/null; then
+        rm -f "$AGENT_KEYS_FILE.bak"
+      else
+        grep -vE "^${KEY}=" "$AGENT_KEYS_FILE" > "${AGENT_KEYS_FILE}.tmp"
+        mv "${AGENT_KEYS_FILE}.tmp" "$AGENT_KEYS_FILE"
+      fi
+    fi
+  fi
+  # Append KEY="value" with double-quotes in value escaped
+  printf '%s="%s"\n' "$KEY" "${VALUE//\"/\\\"}" >> "$AGENT_KEYS_FILE"
+  chmod 600 "$AGENT_KEYS_FILE"
+  dokku_log_info2 "Set $KEY"
+}
+
+agent_unset_key() {
+  declare desc="remove a key from the plugin keys file"
+  declare KEY="$1"
+  [[ -z "$KEY" ]] && dokku_log_fail "Please specify a key name"
+  [[ ! -f "$AGENT_KEYS_FILE" ]] && return 0
+  if sed -i.bak "/^${KEY}=/d" "$AGENT_KEYS_FILE" 2>/dev/null; then
+    rm -f "$AGENT_KEYS_FILE.bak"
+  else
+    grep -vE "^${KEY}=" "$AGENT_KEYS_FILE" > "${AGENT_KEYS_FILE}.tmp" 2>/dev/null || true
+    mv "${AGENT_KEYS_FILE}.tmp" "$AGENT_KEYS_FILE" 2>/dev/null || true
+  fi
+  dokku_log_info2 "Unset $KEY"
+}
+
+agent_list_keys() {
+  declare desc="list key names (no values) from the plugin keys file"
+  [[ ! -f "$AGENT_KEYS_FILE" ]] && return 0
+  grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$AGENT_KEYS_FILE" 2>/dev/null | cut -d= -f1
+}

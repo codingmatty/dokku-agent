@@ -54,6 +54,7 @@ service_start() {
   local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
   local port pid
 
+  agent_load_keys
   [[ ! -d "$SERVICE_ROOT" ]] && dokku_log_fail "Service $SERVICE does not exist"
   port=$(cat "$SERVICE_ROOT/PORT" 2>/dev/null)
   [[ -z "$port" ]] && dokku_log_fail "Service $SERVICE has no PORT"

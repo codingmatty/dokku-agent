@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/common-functions"
+
+cmd-agent-keys() {
+  declare desc="List API key names stored in the plugin (values are not shown)"
+  local cmd="agent:keys"
+  [[ "$1" == "$cmd" ]] && shift 1
+
+  if [[ ! -f "$AGENT_KEYS_FILE" ]] || [[ ! -s "$AGENT_KEYS_FILE" ]]; then
+    dokku_log_warn "No API keys set. Use dokku agent:set-key <KEY> <value>"
+    return 0
+  fi
+  dokku_log_info2_quiet "API keys (stored in plugin):"
+  agent_list_keys
+}
+
+cmd-agent-keys "$@"

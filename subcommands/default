@@ -19,7 +19,8 @@ cmd-agent-default() {
   echo "       dokku agent:api-info <service>        - Show API service info"
   echo "       dokku agent:api-destroy <service>     - Destroy API service"
   echo "       dokku agent:api-expose <service> [port] - Expose on port; agent:api-set-config to update config"
-  echo "       dokku agent:install                    - Verify Docker Agent is installed"
+  echo "       dokku agent:set-key <KEY> <value>     - Set API key; dokku agent:keys to list"
+  echo "       dokku agent:install                    - Install Docker Agent CLI"
   echo ""
   echo "See 'dokku agent:help' for full help."
 }

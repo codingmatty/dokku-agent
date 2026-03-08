@@ -10,7 +10,10 @@ case "$1" in
     agent, Show agent plugin help
     agent:run [config] [message...], Run Docker Agent (TUI or with messages)
     agent:exec <config> <message...>, Run Docker Agent in headless mode (--exec)
-    agent:install, Verify Docker Agent CLI is installed and show install instructions
+    agent:install, Install or verify the Docker Agent CLI
+    agent:set-key <KEY> <value>, Set an API key (stored in plugin, used by all agent commands)
+    agent:unset-key <KEY>, Remove an API key
+    agent:keys, List stored API key names
     agent:api-create <service> [config-path], Create a managed Agent API service
     agent:api-destroy <service>, Destroy an Agent API service
     agent:api-info <service> [--flag], Show Agent API service information

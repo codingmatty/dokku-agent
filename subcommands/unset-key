@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/common-functions"
+
+cmd-agent-unset-key() {
+  declare desc="Remove an API key from the plugin keys file"
+  local cmd="agent:unset-key"
+  [[ "$1" == "$cmd" ]] && shift 1
+  declare KEY="$1"
+
+  [[ -z "$KEY" ]] && dokku_log_fail "Usage: dokku agent:unset-key <KEY>"
+  agent_unset_key "$KEY"
+}
+
+cmd-agent-unset-key "$@"

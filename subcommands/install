@@ -2,6 +2,7 @@
 set -eo pipefail
 [[ $DOKKU_TRACE ]] && set -x
 source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")/config"
 
 : "${DOCKER_BIN:=docker}"
 
@@ -31,6 +32,7 @@ cmd-agent-install() {
     dokku_log_fail "Docker not found. Dokku requires Docker to be installed."
   fi
 
+  agent_load_keys
   if "$DOCKER_BIN" agent version &>/dev/null; then
     echo "Docker Agent CLI is already installed."
     "$DOCKER_BIN" agent version 2>&1 | head -5 || true
@@ -65,7 +67,7 @@ cmd-agent-install() {
   fi
 
   echo ""
-  dokku_log_info1 "Set at least one model API key (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY) for the user running 'dokku agent'."
+  dokku_log_info1 "Set at least one model API key: dokku agent:set-key ANTHROPIC_API_KEY sk-..."
   echo "See https://docker.github.io/docker-agent/ for documentation."
 }
 

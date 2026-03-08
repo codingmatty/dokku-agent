@@ -21,9 +21,9 @@ sudo dokku plugin:install /path/to/dokku-agent agent
   dokku agent:install
   ```
 
-  and follow the printed instructions (download binary, place in `~/.docker/cli-plugins/`, set API keys).
+  to download and install the binary, then set API keys with `dokku agent:set-key`.
 
-- **Model API key** – Set at least one provider key where the Dokku user runs (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`).
+- **Model API key** – Set at least one provider key via the plugin (see below); no need to set it on the host environment.
 
 ## Managed Agent API services
 
@@ -66,6 +66,22 @@ dokku agent:api-destroy test-agent
 
 Each service gets its own port, config directory, session DB, and log files. Data lives under `$DOKKU_LIB_ROOT/services/agent-api/<service>/`.
 
+## API keys (stored in plugin)
+
+Keys are stored under `$DOKKU_LIB_ROOT/data/agent/keys.env` and are **automatically loaded** before every `docker agent` invocation (run, exec, and managed API services). You do not need to set them in the host environment.
+
+| Command                           | Description                    |
+| --------------------------------- | ------------------------------ |
+| `dokku agent:set-key <KEY> <value>` | Set a key (e.g. `ANTHROPIC_API_KEY`) |
+| `dokku agent:unset-key <KEY>`     | Remove a key                   |
+| `dokku agent:keys`                | List stored key names (values not shown) |
+
+```bash
+dokku agent:set-key ANTHROPIC_API_KEY sk-ant-...
+dokku agent:set-key OPENAI_API_KEY sk-...
+dokku agent:keys
+```
+
 ## Other commands
 
 | Command                                  | Description                             |
@@ -74,10 +90,10 @@ Each service gets its own port, config directory, session DB, and log files. Dat
 | `dokku agent:help`                       | Full help                               |
 | `dokku agent:run [config] [message...]`  | Run Docker Agent (TUI or with messages) |
 | `dokku agent:exec <config> <message...>` | Run agent in headless mode              |
-| `dokku agent:install`                    | Check/install Docker Agent CLI          |
+| `dokku agent:install`                    | Install Docker Agent CLI                |
 
 ```bash
-# Passthrough examples
+# Passthrough examples (API keys from plugin are loaded automatically)
 dokku agent:run agent.yaml "Fix the bug in auth.go"
 dokku agent:exec agent.yaml "Create a Dockerfile for a Python Flask app"
 ```
