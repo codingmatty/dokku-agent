@@ -5,8 +5,25 @@ source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
 
 : "${DOCKER_BIN:=docker}"
 
+# Detect OS and arch for docker-agent binary (cagent-<os>-<arch>)
+install_detect_platform() {
+  local os arch
+  case "$(uname -s)" in
+    Darwin) os=darwin ;;
+    Linux)  os=linux ;;
+    *)      dokku_log_fail "Unsupported OS: $(uname -s)" ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    armv7l) arch=arm ;;
+    *)      dokku_log_fail "Unsupported arch: $(uname -m)" ;;
+  esac
+  echo "cagent-${os}-${arch}"
+}
+
 cmd-agent-install() {
-  declare desc="Verify Docker Agent CLI is installed and show install instructions"
+  declare desc="Install or verify the Docker Agent CLI plugin"
   declare cmd="agent:install"
   [[ "$1" == "$cmd" ]] && shift 1
 
@@ -14,29 +31,42 @@ cmd-agent-install() {
     dokku_log_fail "Docker not found. Dokku requires Docker to be installed."
   fi
 
-  if "$DOCKER_BIN" agent run --help &>/dev/null; then
+  if "$DOCKER_BIN" agent version &>/dev/null; then
     echo "Docker Agent CLI is already installed."
-    "$DOCKER_BIN" agent run --help 2>&1 | head -5 || true
+    "$DOCKER_BIN" agent version 2>&1 | head -5 || true
     return 0
   fi
 
-  dokku_log_info1 "Docker Agent CLI is not installed."
+  if ! command -v curl &>/dev/null; then
+    dokku_log_fail "curl is required to install Docker Agent. Install curl and try again."
+  fi
+
+  dokku_log_info1 "Installing Docker Agent CLI..."
+  local binary_name plugin_dir download_url tag
+  binary_name=$(install_detect_platform)
+  plugin_dir="${HOME}/.docker/cli-plugins"
+  mkdir -p "$plugin_dir" || dokku_log_fail "Cannot create $plugin_dir"
+
+  tag=$(curl -sSfL "https://api.github.com/repos/docker/docker-agent/releases/latest" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')
+  [[ -z "$tag" ]] && dokku_log_fail "Could not determine latest Docker Agent release"
+  download_url="https://github.com/docker/docker-agent/releases/download/${tag}/${binary_name}"
+  dokku_log_verbose "Downloading $download_url"
+
+  if ! curl -sSfL "$download_url" -o "${plugin_dir}/docker-agent"; then
+    dokku_log_fail "Download failed. Check https://github.com/docker/docker-agent/releases for your platform."
+  fi
+  chmod +x "${plugin_dir}/docker-agent"
+
+  if "$DOCKER_BIN" agent version &>/dev/null; then
+    dokku_log_info2 "Docker Agent CLI installed successfully."
+    "$DOCKER_BIN" agent version 2>&1 | head -5 || true
+  else
+    dokku_log_fail "Installation completed but 'docker agent' is not available. Check PATH or Docker CLI plugin path."
+  fi
+
   echo ""
-  echo "To install the Docker Agent CLI plugin on this server:"
-  echo ""
-  echo "1. Download the latest binary from:"
-  echo "   https://github.com/docker/docker-agent/releases"
-  echo ""
-  echo "2. Install the CLI plugin (run as the user that runs 'dokku agent'):"
-  echo "   mkdir -p ~/.docker/cli-plugins"
-  echo "   mv docker-agent ~/.docker/cli-plugins/"
-  echo "   chmod +x ~/.docker/cli-plugins/docker-agent"
-  echo ""
-  echo "3. Set at least one model API key (e.g. in ~/.bashrc or server env):"
-  echo "   export OPENAI_API_KEY=sk-..."
-  echo "   # or ANTHROPIC_API_KEY, GOOGLE_API_KEY, etc."
-  echo ""
-  echo "See https://docker.github.io/docker-agent/ for full documentation."
+  dokku_log_info1 "Set at least one model API key (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY) for the user running 'dokku agent'."
+  echo "See https://docker.github.io/docker-agent/ for documentation."
 }
 
 cmd-agent-install "$@"

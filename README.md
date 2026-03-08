@@ -6,7 +6,7 @@ A [Dokku](https://dokku.com/) plugin to run [Docker Agent](https://docker.github
 
 ```bash
 # From Git (clone or add as submodule)
-sudo dokku plugin:install https://github.com/YOUR_USER/dokku-agent.git agent
+sudo dokku plugin:install https://github.com/codingmatty/dokku-agent.git agent
 
 # Or from a local path
 sudo dokku plugin:install /path/to/dokku-agent agent
@@ -29,19 +29,19 @@ sudo dokku plugin:install /path/to/dokku-agent agent
 
 Create named Agent API instances, link them to apps, and manage them like Postgres or Redis.
 
-| Command | Description |
-|--------|-------------|
-| `dokku agent:api-create <service> [config-path]` | Create an Agent API service (optional agent.yaml path) |
-| `dokku agent:api-info <service> [--url\|--port\|--status\|--links]` | Show service info |
-| `dokku agent:api-link <service> <app>` | Link service to app (sets `AGENT_API_URL`) |
-| `dokku agent:api-unlink <service> <app>` | Unlink service from app |
-| `dokku agent:api-list` | List all Agent API services |
-| `dokku agent:api-start <service>` | Start the API server |
-| `dokku agent:api-stop <service>` | Stop the API server |
-| `dokku agent:api-destroy <service>` | Destroy service (unlink first) |
-| `dokku agent:api-expose <service> [port]` | Expose service on a port (optionally set port and start) |
-| `dokku agent:api-unexpose <service>` | Stop service (no longer exposed) |
-| `dokku agent:api-set-config <service> <path>` | Update agent.yaml from file and restart |
+| Command                                                             | Description                                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------- |
+| `dokku agent:api-create <service> [config-path]`                    | Create an Agent API service (optional agent.yaml path)   |
+| `dokku agent:api-info <service> [--url\|--port\|--status\|--links]` | Show service info                                        |
+| `dokku agent:api-link <service> <app>`                              | Link service to app (sets `AGENT_API_URL`)               |
+| `dokku agent:api-unlink <service> <app>`                            | Unlink service from app                                  |
+| `dokku agent:api-list`                                              | List all Agent API services                              |
+| `dokku agent:api-start <service>`                                   | Start the API server                                     |
+| `dokku agent:api-stop <service>`                                    | Stop the API server                                      |
+| `dokku agent:api-destroy <service>`                                 | Destroy service (unlink first)                           |
+| `dokku agent:api-expose <service> [port]`                           | Expose service on a port (optionally set port and start) |
+| `dokku agent:api-unexpose <service>`                                | Stop service (no longer exposed)                         |
+| `dokku agent:api-set-config <service> <path>`                       | Update agent.yaml from file and restart                  |
 
 ### Example workflow
 
@@ -68,13 +68,13 @@ Each service gets its own port, config directory, session DB, and log files. Dat
 
 ## Other commands
 
-| Command | Description |
-|--------|-------------|
-| `dokku agent` | Show short usage |
-| `dokku agent:help` | Full help |
-| `dokku agent:run [config] [message...]` | Run Docker Agent (TUI or with messages) |
-| `dokku agent:exec <config> <message...>` | Run agent in headless mode |
-| `dokku agent:install` | Check/install Docker Agent CLI |
+| Command                                  | Description                             |
+| ---------------------------------------- | --------------------------------------- |
+| `dokku agent`                            | Show short usage                        |
+| `dokku agent:help`                       | Full help                               |
+| `dokku agent:run [config] [message...]`  | Run Docker Agent (TUI or with messages) |
+| `dokku agent:exec <config> <message...>` | Run agent in headless mode              |
+| `dokku agent:install`                    | Check/install Docker Agent CLI          |
 
 ```bash
 # Passthrough examples
