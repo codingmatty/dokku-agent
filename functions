@@ -68,14 +68,14 @@ service_start() {
     rm -f "$SERVICE_ROOT/PID"
   fi
 
-  if ! "$DOCKER_BIN" agent api --help &>/dev/null; then
+  if ! "$DOCKER_BIN" agent version --help &>/dev/null; then
     dokku_log_fail "Docker Agent CLI not found. Run 'dokku agent:install' for instructions."
   fi
 
   local session_db="$SERVICE_ROOT/sessions.db"
   (
     set +e
-    nohup "$DOCKER_BIN" agent api "$SERVICE_ROOT/agent.yaml" \
+    nohup "$DOCKER_BIN" agent serve api "$SERVICE_ROOT/agent.yaml" \
       --listen "0.0.0.0:$port" \
       --session-db "$session_db" \
       >> "$SERVICE_ROOT/log" 2>> "$SERVICE_ROOT/error.log" &
