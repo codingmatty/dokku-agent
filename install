@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+
+# Source config to get paths (DOKKU_LIB_ROOT is set by Dokku when running this trigger)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
+
+: "${DOCKER_BIN:=docker}"
+
+# Simple log (install trigger may not have dokku_log_*)
+log_info() { echo "=====> $*"; }
+log_step() { echo "-----> $*"; }
+
+# Detect OS and arch for docker-agent binary (cagent-<os>-<arch>)
+agent_install_detect_platform() {
+  local os arch
+  case "$(uname -s)" in
+    Darwin) os=darwin ;;
+    Linux)  os=linux ;;
+    *)      return 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    armv7l) arch=arm ;;
+    *)      return 1 ;;
+  esac
+  echo "cagent-${os}-${arch}"
+}
+
+# -----------------------------------------------------------------------------
+# 1. Create plugin data directories and set ownership
+# -----------------------------------------------------------------------------
+log_info "Creating plugin data directories"
+
+log_step "Creating $PLUGIN_DATA_ROOT"
+mkdir -p "$PLUGIN_DATA_ROOT" || true
+
+log_step "Creating $(dirname "$AGENT_KEYS_FILE")"
+mkdir -p "$(dirname "$AGENT_KEYS_FILE")" || true
+
+if [[ -n "${DOKKU_SYSTEM_USER:-}" ]] && [[ -n "${DOKKU_SYSTEM_GROUP:-}" ]]; then
+  log_step "Setting ownership to ${DOKKU_SYSTEM_USER}:${DOKKU_SYSTEM_GROUP}"
+  chown "${DOKKU_SYSTEM_USER}:${DOKKU_SYSTEM_GROUP}" "$PLUGIN_DATA_ROOT" 2>/dev/null || true
+  chown -R "${DOKKU_SYSTEM_USER}:${DOKKU_SYSTEM_GROUP}" "$(dirname "$AGENT_KEYS_FILE")" 2>/dev/null || true
+fi
+
+# -----------------------------------------------------------------------------
+# 2. Install Docker Agent CLI for the dokku user
+# -----------------------------------------------------------------------------
+install_docker_agent_cli() {
+  log_info "Installing Docker Agent CLI"
+
+  if ! command -v "$DOCKER_BIN" &>/dev/null; then
+    log_step "Skipping: docker not found"
+    return 0
+  fi
+
+  if ! command -v curl &>/dev/null; then
+    log_step "Skipping: curl not found"
+    return 0
+  fi
+
+  binary_name=$(agent_install_detect_platform 2>/dev/null) || true
+  if [[ -z "$binary_name" ]]; then
+    log_step "Skipping: unsupported platform $(uname -s)/$(uname -m)"
+    return 0
+  fi
+
+  if [[ -z "${DOKKU_SYSTEM_USER:-}" ]] || [[ -z "${DOKKU_SYSTEM_GROUP:-}" ]]; then
+    log_step "Skipping: DOKKU_SYSTEM_USER not set"
+    return 0
+  fi
+
+  dokku_home=$(getent passwd "$DOKKU_SYSTEM_USER" 2>/dev/null | cut -d: -f6)
+  if [[ -z "$dokku_home" ]]; then
+    log_step "Skipping: could not get home for user $DOKKU_SYSTEM_USER"
+    return 0
+  fi
+
+  plugin_dir="${dokku_home}/.docker/cli-plugins"
+  log_step "Creating $plugin_dir"
+  mkdir -p "$plugin_dir" || true
+
+  if [[ ! -d "$plugin_dir" ]]; then
+    log_step "Skipping: could not create $plugin_dir"
+    return 0
+  fi
+
+  log_step "Fetching latest Docker Agent release tag"
+  tag=$(curl -sSfL "https://api.github.com/repos/docker/docker-agent/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')
+  if [[ -z "$tag" ]]; then
+    log_step "Skipping: could not fetch release tag"
+    return 0
+  fi
+
+  download_url="https://github.com/docker/docker-agent/releases/download/${tag}/${binary_name}"
+  log_step "Downloading $binary_name ($tag)"
+  if ! curl -sSfL "$download_url" -o "${plugin_dir}/docker-agent"; then
+    log_step "Download failed (platform: $binary_name)"
+    return 0
+  fi
+
+  chmod +x "${plugin_dir}/docker-agent"
+  chown "${DOKKU_SYSTEM_USER}:${DOKKU_SYSTEM_GROUP}" "${plugin_dir}/docker-agent" 2>/dev/null || true
+  log_info "Docker Agent CLI installed for $DOKKU_SYSTEM_USER"
+}
+
+install_docker_agent_cli

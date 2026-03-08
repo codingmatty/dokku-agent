@@ -12,16 +12,19 @@ sudo dokku plugin:install https://github.com/codingmatty/dokku-agent.git agent
 sudo dokku plugin:install /path/to/dokku-agent agent
 ```
 
+If you see **Permission denied** when creating a service (e.g. `mkdir: cannot create directory '/var/lib/dokku/services/agent-api'`), the install trigger needs to run to create and chown the data directories. Either reinstall the plugin (run the `sudo dokku plugin:install` command again) or fix permissions once:
+
+```bash
+sudo mkdir -p /var/lib/dokku/services/agent-api /var/lib/dokku/data/agent
+sudo chown -R dokku:dokku /var/lib/dokku/services/agent-api /var/lib/dokku/data/agent
+```
+
+(Use your Dokku system user/group if different from `dokku`.)
+
 ## Prerequisites
 
 - **Docker** – Already present on Dokku hosts.
-- **Docker Agent CLI** – Install the Docker Agent CLI plugin so `docker agent` is available. Run:
-
-  ```bash
-  dokku agent:install
-  ```
-
-  to download and install the binary, then set API keys with `dokku agent:set-key`.
+- **Docker Agent CLI** – Installed automatically when you install the plugin (the install trigger downloads the binary for the dokku user). Run `dokku agent:install` to verify; set API keys with `dokku agent:set-key`.
 
 - **Model API key** – Set at least one provider key via the plugin (see below); no need to set it on the host environment.
 
@@ -70,11 +73,11 @@ Each service gets its own port, config directory, session DB, and log files. Dat
 
 Keys are stored under `$DOKKU_LIB_ROOT/data/agent/keys.env` and are **automatically loaded** before every `docker agent` invocation (run, exec, and managed API services). You do not need to set them in the host environment.
 
-| Command                           | Description                    |
-| --------------------------------- | ------------------------------ |
-| `dokku agent:set-key <KEY> <value>` | Set a key (e.g. `ANTHROPIC_API_KEY`) |
-| `dokku agent:unset-key <KEY>`     | Remove a key                   |
-| `dokku agent:keys`                | List stored key names (values not shown) |
+| Command                             | Description                              |
+| ----------------------------------- | ---------------------------------------- |
+| `dokku agent:set-key <KEY> <value>` | Set a key (e.g. `ANTHROPIC_API_KEY`)     |
+| `dokku agent:unset-key <KEY>`       | Remove a key                             |
+| `dokku agent:keys`                  | List stored key names (values not shown) |
 
 ```bash
 dokku agent:set-key ANTHROPIC_API_KEY sk-ant-...
@@ -90,7 +93,6 @@ dokku agent:keys
 | `dokku agent:help`                       | Full help                               |
 | `dokku agent:run [config] [message...]`  | Run Docker Agent (TUI or with messages) |
 | `dokku agent:exec <config> <message...>` | Run agent in headless mode              |
-| `dokku agent:install`                    | Install Docker Agent CLI                |
 
 ```bash
 # Passthrough examples (API keys from plugin are loaded automatically)
