@@ -25,12 +25,14 @@ service_create() {
   declare desc="create an agent API service"
   declare SERVICE="$1"
   local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local WORKING_DIR="$SERVICE_ROOT/working-dir"
   local CONFIG_PATH="$2"  # optional path to agent.yaml
 
   is_valid_service_name "$SERVICE" || dokku_log_fail "Invalid service name. Use only [A-Za-z0-9_-]"
   [[ -d "$SERVICE_ROOT" ]] && dokku_log_fail "Agent API service $SERVICE already exists"
 
   mkdir -p "$SERVICE_ROOT" || dokku_log_fail "Unable to create service directory"
+  mkdir -p "$WORKING_DIR" || dokku_log_fail "Unable to create working directory"
   touch "$SERVICE_ROOT/LINKS"
 
   if [[ -n "$CONFIG_PATH" ]] && [[ -f "$CONFIG_PATH" ]]; then
@@ -52,6 +54,7 @@ service_start() {
   declare SERVICE="$1"
   local QUIET="${2:-}"
   local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local WORKING_DIR="$SERVICE_ROOT/working-dir"
   local port pid
 
   agent_load_keys
@@ -75,6 +78,7 @@ service_start() {
   local session_db="$SERVICE_ROOT/sessions.db"
   (
     set +e
+    cd "$WORKING_DIR"
     nohup "$DOCKER_BIN" agent serve api "$SERVICE_ROOT/agent.yaml" \
       --listen "0.0.0.0:$port" \
       --session-db "$session_db" \
@@ -136,6 +140,7 @@ service_info() {
   declare SERVICE="$1"
   local INFO_FLAG="$2"
   local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local WORKING_DIR="$SERVICE_ROOT/working-dir"
   local SERVICE_URL port status_val links_val
 
   SERVICE_URL=$(service_url "$SERVICE")
@@ -149,6 +154,7 @@ service_info() {
     dokku_log_verbose "$(printf "%-20s %s" "links" "$links_val")"
     dokku_log_verbose "$(printf "%-20s %s" "port" "$port")"
     dokku_log_verbose "$(printf "%-20s %s" "service-root" "$SERVICE_ROOT")"
+    dokku_log_verbose "$(printf "%-20s %s" "working-dir" "$WORKING_DIR")"
     dokku_log_verbose "$(printf "%-20s %s" "status" "$status_val")"
     dokku_log_verbose "$(printf "%-20s %s" "url" "$SERVICE_URL")"
   else
@@ -159,7 +165,8 @@ service_info() {
       --service-root) echo "$SERVICE_ROOT" ;;
       --status) echo "$status_val" ;;
       --url) echo "$SERVICE_URL" ;;
-      *) dokku_log_fail "Invalid flag. Valid: --config, --links, --port, --service-root, --status, --url" ;;
+      --working-dir) echo "$WORKING_DIR" ;;
+      *) dokku_log_fail "Invalid flag. Valid: --config, --links, --port, --service-root, --status, --url, --working-dir" ;;
     esac
   fi
 }
