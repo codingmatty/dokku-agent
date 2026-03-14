@@ -14,7 +14,7 @@ export PLUGIN_SCHEME="http"
 export AGENT_API_DEFAULT_HOST="${AGENT_API_DEFAULT_HOST:=172.17.0.1}"
 
 # API keys file (used by agent_load_keys before any docker agent invocation)
-export AGENT_KEYS_FILE="${AGENT_KEYS_FILE:=$DOKKU_LIB_ROOT/data/agent/keys.env}"
+export AGENT_KEYS_FILE="${AGENT_KEYS_FILE:=$DOKKU_LIB_ROOT/data/agent-api/keys.env}"
 
 # Load API keys from plugin keys file into current environment (no-op if file missing)
 agent_load_keys() {
