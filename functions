@@ -81,7 +81,7 @@ service_start() {
     set +e
     cd "$WORKING_DIR"
     nohup "$DOCKER_BIN" agent serve api "$SERVICE_ROOT/agent.yaml" \
-      --listen "0.0.0.0:$port" \
+      --listen "127.0.0.1:$port" \
       --session-db "$session_db" \
       >> "$SERVICE_ROOT/log" 2>> "$SERVICE_ROOT/error.log" &
     echo $! > "$SERVICE_ROOT/PID"
@@ -132,7 +132,7 @@ service_url() {
   declare SERVICE="$1"
   local port host
   port=$(cat "$PLUGIN_DATA_ROOT/$SERVICE/PORT" 2>/dev/null)
-  host="${AGENT_API_DEFAULT_HOST:-172.17.0.1}"
+  host="host.docker.internal"
   echo "${PLUGIN_SCHEME}://${host}:${port}"
 }
 
@@ -177,11 +177,9 @@ service_link() {
   declare desc="link agent API service to an app"
   declare SERVICE="$1" APP="$2"
   local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
-  local SERVICE_URL
+  local SERVICE_URL=$(service_url "$SERVICE")
   local LINKS_FILE="$SERVICE_ROOT/LINKS"
   local ALIAS="${PLUGIN_DEFAULT_ALIAS}_URL"
-
-  SERVICE_URL=$(service_url "$SERVICE")
 
   if in_links_file "$SERVICE" "$APP"; then
     dokku_log_fail "App $APP is already linked to Agent API service $SERVICE"
