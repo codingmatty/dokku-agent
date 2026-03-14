@@ -132,7 +132,7 @@ service_url() {
   declare SERVICE="$1"
   local port host
   port=$(cat "$PLUGIN_DATA_ROOT/$SERVICE/PORT" 2>/dev/null)
-  host="${AGENT_API_DEFAULT_HOST:-172.17.0.1}"
+  host="$(service_dns_hostname "$SERVICE")"
   echo "${PLUGIN_SCHEME}://${host}:${port}"
 }
 

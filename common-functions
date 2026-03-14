@@ -172,3 +172,17 @@ agent_list_keys() {
   [[ ! -f "$AGENT_KEYS_FILE" ]] && return 0
   grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$AGENT_KEYS_FILE" 2>/dev/null | cut -d= -f1
 }
+
+
+get_service_name() {
+  declare desc="retrieve a docker service label"
+  declare SERVICE="$1"
+  echo "dokku.${PLUGIN_COMMAND_PREFIX}.$SERVICE"
+}
+
+service_dns_hostname() {
+  declare desc="retrieve the alias of a service"
+  declare SERVICE="$1"
+  local SERVICE_NAME="$(get_service_name "$SERVICE")"
+  echo "$SERVICE_NAME" | tr ._ -
+}
