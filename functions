@@ -81,7 +81,7 @@ service_start() {
     set +e
     cd "$WORKING_DIR"
     nohup "$DOCKER_BIN" agent serve api "$SERVICE_ROOT/agent.yaml" \
-      --listen "127.0.0.1:$port" \
+      --listen "0.0.0.0:$port" \
       --session-db "$session_db" \
       >> "$SERVICE_ROOT/log" 2>> "$SERVICE_ROOT/error.log" &
     echo $! > "$SERVICE_ROOT/PID"
