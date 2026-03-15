@@ -112,6 +112,16 @@ service_stop() {
   dokku_log_verbose_quiet "Agent API service $SERVICE stopped"
 }
 
+service_restart() {
+  declare desc="stop and start the agent API server for a service"
+  declare SERVICE="$1"
+
+  [[ -z "$SERVICE" ]] && dokku_log_fail "Please specify a service name"
+  service_stop "$SERVICE"
+  service_start "$SERVICE"
+  dokku_log_info2 "Agent API service $SERVICE restarted"
+}
+
 service_status() {
   declare desc="output running or stopped"
   declare SERVICE="$1"
