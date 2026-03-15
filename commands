@@ -21,6 +21,7 @@ case "$1" in
     agent:api-list, List Agent API services
     agent:api-start <service>, Start Agent API service
     agent:api-stop <service>, Stop Agent API service
+    agent:api-restart <service>, Restart Agent API service
     agent:api-unlink <service> <app>, Unlink Agent API service from an app
     agent:api-expose <service> [port], Expose Agent API service (set port and/or start)
     agent:api-unexpose <service>, Stop service (no longer exposed)
